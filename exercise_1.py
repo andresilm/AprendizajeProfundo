@@ -8,7 +8,7 @@ from keras.layers import Activation, Dense, Dropout
 from sklearn.datasets import load_files
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
-
+from sklearn.metrics import accuracy_score
 
 def read_args():
     parser = argparse.ArgumentParser(description='Exercise 1')
@@ -94,32 +94,40 @@ def main():
 
     print(model.summary())
 
-    model.compile(...)
-
+    model.compile(loss='categorical_crossentropy',
+                  optimizer=optimizers.Adagrad(lr=0.001, decay=0.0001), 
+                  metrics=['accuracy']) 
 
     # TODO 4: Fit the model
-    # hitory = model.fit(batch_size=??, ...)
+    history = model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs)
 
     # TODO 5: Evaluate the model, calculating the metrics.
     # Option 1: Use the model.evaluate() method. For this, the model must be
     # already compiled with the metrics.
-    performance = model.evaluate(X_test, y_test)
+    #performance = model.evaluate(X_test)
 
     # Option 2: Use the model.predict() method and calculate the metrics using
     # sklearn. We recommend this, because you can store the predictions if
     # you need more analysis later. Also, if you calculate the metrics on a
     # notebook, then you can compare multiple classifiers.
-    # predictions = ...
-    # performance = ...
+    predictions = model.predict(X_test)
+    score = accuracy_score(y_test_orginal, predictions)
 
     # TODO 6: Save the results.
-    # ...
 
     # One way to store the predictions:
     results = pandas.DataFrame(y_test_orginal, columns=['true_label'])
     results.loc[:, 'predicted'] = predictions
     results.to_csv('predicitions_{}.csv'.format(args.experiment_name),
                    index=False)
+
+    
+    results.to_csv('score{}.csv'.format(args.experiment_name),
+                   index=False)
+    
+    score_file  = open('score{}.txt'.format(args.experiment_name), 'w')
+    score_file.write(str(score))
+    score.close()
 
 
 
