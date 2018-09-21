@@ -18,23 +18,22 @@ def read_args():
     parser = argparse.ArgumentParser(description='Exercise 1')
     # Here you have some examples of classifier parameters. You can add
     # more arguments or change these if you need to.
-    parser.add_argument('--h_units', nargs='+', default=[100], type=int,
+    parser.add_argument('--h_units', nargs='+', default=[1], type=int,
                         help='Number of hidden units of each hidden layer.')
-    parser.add_argument('--dropout', nargs='+', default=[0.5], type=float,
+    parser.add_argument('--dropout', nargs='+', default=[1], type=float,
                         help='Dropout ratio for every layer.')
-    parser.add_argument('--batch_size', type=int, default=32,
+    parser.add_argument('--batch_size', type=int, default=128,
                         help='Number of instances in each batch.')
     parser.add_argument('--experiment_name', type=str, default=None,
                         help='Name of the experiment, used in the filename'
                              'where the results are stored.')
-    parser.add_argument('--epochs', type=int, default=5,
+    parser.add_argument('--epochs', type=int, default=10,
                         help='Number of epochs')
-    parser.add_argument('--reg_l2', type=int, default=1,
+    parser.add_argument('--reg_l2', type=float, default=0,
                         help='L2 regularization parameter')
 
     args = parser.parse_args()
 
-    assert len(args.h_units) == len(args.dropout)
     return args
 
 
@@ -71,37 +70,39 @@ def main():
     X_train, X_test, y_train, y_test_orginal = load_dataset()
 
     # TODO 2: Convert the labels to categorical
-    y_train = keras.utils.to_categorical(y_train, 2)
     y_test_orginal = keras.utils.to_categorical(y_test_orginal, 2)
-    print(y_train)
+
+    print()
     # TODO 3: Build the Keras model
     model = Sequential()
     # Add all the layers
-    layers_dims = args.h_units
+    
+    units_output_layer = y_test_orginal.shape[1] #one per class
 
-    if len(layers_dims) > 1:
+    if len(args.h_units) > 0:
         # Input to hidden layer 
-        model.add(Dense(layers_dims[0], input_dim=X_train.shape[1], kernel_regularizer=regularizers.l2(args.reg_l2)))
+        model.add(Dense(args.h_units[0], input_dim=X_train.shape[1], kernel_regularizer=regularizers.l2(args.reg_l2)))
         model.add(Dropout(args.dropout[0]))
         model.add(Activation('relu'))
 
-        for i in range(1, len(layers_dims) - 1):
-            model.add(Dense(layers_dims[i],  input_dim=X_train.shape[1], kernel_regularizer=regularizers.l2(args.reg_l2)))
+        for i in range(1, len(args.h_units)):
+            model.add(Dense(args.h_units[i],  input_dim=X_train.shape[1], kernel_regularizer=regularizers.l2(args.reg_l2)))
             model.add(Dropout(args.dropout[i]))
             model.add(Activation('relu'))
         
         # Hidden to output layer
-        model.add(Dense(layers_dims[len(layers_dims) - 1],  input_dim=X_train.shape[1], kernel_regularizer=regularizers.l2(args.reg_l2)))
-        model.add(Dropout(args.dropout[len(layers_dims) - 1]))
+        model.add(Dense(units_output_layer, kernel_regularizer=regularizers.l2(args.reg_l2)))
+        model.add(Dropout(args.dropout[len(args.h_units) - 1]))
         model.add(Activation('softmax'))
     else:
-        model = Sequential([(Dense(layers_dims[0], activation='softmax', input_shape=(X_train.shape[1], ))), 
-                            Dropout(args.dropout[0], input_shape=(X_train.shape[1], ))
+        model = Sequential([(Dense(units_output_layer, input_shape=(X_train.shape[1], ))), 
+                            Dropout(args.dropout[0], input_shape=(X_train.shape[1], )),
+                            Activation('softmax')   
                           ])
 
     print(model.summary())
 
-    model.compile(loss='categorical_crossentropy',
+    model.compile(loss='sparse_categorical_crossentropy',
                   optimizer=optimizers.Adagrad(lr=0.001, decay=0.0001), 
                   metrics=['accuracy']) 
     
@@ -119,6 +120,7 @@ def main():
     # you need more analysis later. Also, if you calculate the metrics on a
     # notebook, then you can compare multiple classifiers.
     predictions = model.predict(X_test)
+    
     score = accuracy_score(y_test_orginal, predictions)
 
     # TODO 6: Save the results.
