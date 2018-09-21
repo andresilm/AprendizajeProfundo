@@ -2,16 +2,21 @@
 
 import argparse
 import pandas
-
-import keras
-from keras.models import Sequential
-from keras.layers import Activation, Dense, Dropout
-from keras import optimizers, regularizers
-
 from sklearn.datasets import load_files
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import accuracy_score
+
+
+#make sure our experiment in keras is reproducible
+import numpy
+numpy.random.seed(42)
+
+#now, import keras 
+import keras
+from keras.models import Sequential
+from keras.layers import Activation, Dense, Dropout
+from keras import optimizers, regularizers
 
 
 def read_args():
@@ -121,24 +126,29 @@ def main():
     # notebook, then you can compare multiple classifiers.
     predictions = model.predict(X_test)
     
-    score = accuracy_score(y_test_orginal, predictions)
+    for sample in predictions:
+        if sample[0] < 0.5:
+            sample[0] = 0
+        else:
+            sample[0] = 1
 
+        if sample[1] < 0.5:
+            sample[1] = 0
+        else:
+            sample[1] = 1
+    
+    acc = accuracy_score(predictions, y_test_orginal)
     # TODO 6: Save the results.
 
-    # One way to store the predictions:
+
+    score_file  = open('score_{}.txt'.format(args.experiment_name), 'w')
+    score_file.write(str(acc) + '\n')
+    score_file.close()
+
     results = pandas.DataFrame(y_test_orginal, columns=['true_label'])
     results.loc[:, 'predicted'] = predictions
-    results.to_csv('predicitions_{}.csv'.format(args.experiment_name),
+    results.to_csv('predictions_{}.csv'.format(args.experiment_name),
                    index=False)
-
-    
-    results.to_csv('score{}.csv'.format(args.experiment_name),
-                   index=False)
-    
-    score_file  = open('score{}.txt'.format(args.experiment_name), 'w')
-    score_file.write(str(score))
-    score.close()
-
 
 
 if __name__ == '__main__':
