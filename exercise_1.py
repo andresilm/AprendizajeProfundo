@@ -3,12 +3,16 @@
 import argparse
 import pandas
 
+import keras
 from keras.models import Sequential
 from keras.layers import Activation, Dense, Dropout
+from keras import optimizers, regularizers
+
 from sklearn.datasets import load_files
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import accuracy_score
+
 
 def read_args():
     parser = argparse.ArgumentParser(description='Exercise 1')
@@ -23,8 +27,10 @@ def read_args():
     parser.add_argument('--experiment_name', type=str, default=None,
                         help='Name of the experiment, used in the filename'
                              'where the results are stored.')
-    parser.add_argument('--epochs', type=int, default=30,
+    parser.add_argument('--epochs', type=int, default=5,
                         help='Number of epochs')
+    parser.add_argument('--reg_l2', type=int, default=1,
+                        help='L2 regularization parameter')
 
     args = parser.parse_args()
 
@@ -55,7 +61,7 @@ def load_dataset():
     X_train = vectorizer.transform(X_train)
     X_test = vectorizer.transform(X_test)
     
-    print(X_train.shape)
+    print("X_train shape = " + str(X_train.shape))
 
     return X_train, X_test, y_train, y_test
 
@@ -65,8 +71,9 @@ def main():
     X_train, X_test, y_train, y_test_orginal = load_dataset()
 
     # TODO 2: Convert the labels to categorical
-    # ...
-
+    y_train = keras.utils.to_categorical(y_train, 2)
+    y_test_orginal = keras.utils.to_categorical(y_test_orginal, 2)
+    print(y_train)
     # TODO 3: Build the Keras model
     model = Sequential()
     # Add all the layers
@@ -74,32 +81,33 @@ def main():
 
     if len(layers_dims) > 1:
         # Input to hidden layer 
-        model.add(Dense(layers_dims[0], input_shape=(X_train.shape[1], )))
+        model.add(Dense(layers_dims[0], input_dim=X_train.shape[1], kernel_regularizer=regularizers.l2(args.reg_l2)))
         model.add(Dropout(args.dropout[0]))
         model.add(Activation('relu'))
 
         for i in range(1, len(layers_dims) - 1):
-            model.add(Dense(layers_dims[i]))
+            model.add(Dense(layers_dims[i],  input_dim=X_train.shape[1], kernel_regularizer=regularizers.l2(args.reg_l2)))
             model.add(Dropout(args.dropout[i]))
             model.add(Activation('relu'))
         
         # Hidden to output layer
-        model.add(Dense(layers_dims[len(layers_dims) - 1]))
+        model.add(Dense(layers_dims[len(layers_dims) - 1],  input_dim=X_train.shape[1], kernel_regularizer=regularizers.l2(args.reg_l2)))
         model.add(Dropout(args.dropout[len(layers_dims) - 1]))
         model.add(Activation('softmax'))
     else:
-        model.add(Dense(layers_dims[0], input_shape=(X_train.shape[1], )))
-        model.add(Dropout(args.dropout[0]))
-        model.add(Activation('softmax'))
+        model = Sequential([(Dense(layers_dims[0], activation='softmax', input_shape=(X_train.shape[1], ))), 
+                            Dropout(args.dropout[0], input_shape=(X_train.shape[1], ))
+                          ])
 
     print(model.summary())
 
     model.compile(loss='categorical_crossentropy',
                   optimizer=optimizers.Adagrad(lr=0.001, decay=0.0001), 
                   metrics=['accuracy']) 
-
+    
+    
     # TODO 4: Fit the model
-    history = model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs)
+    history = model.fit(X_train, y_train, batch_size=args.batch_size, epochs=args.epochs)
 
     # TODO 5: Evaluate the model, calculating the metrics.
     # Option 1: Use the model.evaluate() method. For this, the model must be
