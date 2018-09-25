@@ -1,5 +1,9 @@
 # Exercise 1
 
+#make sure our experiment in keras is reproducible
+import numpy
+numpy.random.seed(42)
+
 import argparse
 import pandas
 from sklearn.datasets import load_files
@@ -7,10 +11,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import accuracy_score
 
-
-#make sure our experiment in keras is reproducible
-import numpy
-numpy.random.seed(42)
+from tensorflow import set_random_seed
+set_random_seed(42)
 
 #now, import keras 
 import keras
@@ -25,7 +27,7 @@ def read_args():
     # more arguments or change these if you need to.
     parser.add_argument('--h_units', nargs='+', default=[1], type=int,
                         help='Number of hidden units of each hidden layer.')
-    parser.add_argument('--dropout', nargs='+', default=[1], type=float,
+    parser.add_argument('--dropout', nargs='+', default=[0], type=float,
                         help='Dropout ratio for every layer.')
     parser.add_argument('--batch_size', type=int, default=128,
                         help='Number of instances in each batch.')
@@ -75,14 +77,15 @@ def main():
     X_train, X_test, y_train, y_test_orginal = load_dataset()
 
     # TODO 2: Convert the labels to categorical
-    y_test_orginal = keras.utils.to_categorical(y_test_orginal, 2)
+    y_test_orginal_categ = keras.utils.to_categorical(y_test_orginal, 2)
+    y_train_categ = keras.utils.to_categorical(y_train, 2)
 
     print()
     # TODO 3: Build the Keras model
     model = Sequential()
     # Add all the layers
     
-    units_output_layer = y_test_orginal.shape[1] #one per class
+    units_output_layer = y_test_orginal_categ.shape[1] #one per class
 
     if len(args.h_units) > 0:
         # Input to hidden layer 
@@ -96,24 +99,25 @@ def main():
             model.add(Activation('relu'))
         
         # Hidden to output layer
-        model.add(Dense(units_output_layer, kernel_regularizer=regularizers.l2(args.reg_l2)))
-        model.add(Dropout(args.dropout[len(args.h_units) - 1]))
+        model.add(Dense(units_output_layer))
         model.add(Activation('softmax'))
     else:
-        model = Sequential([(Dense(units_output_layer, input_shape=(X_train.shape[1], ))), 
-                            Dropout(args.dropout[0], input_shape=(X_train.shape[1], )),
+        dropout = 0
+        if len(args.dropout) > 0:
+            dropout = args.dropout[0]
+        model = Sequential([(Dense(units_output_layer, input_shape=(X_train.shape[1], ))),
                             Activation('softmax')   
                           ])
 
     print(model.summary())
 
-    model.compile(loss='sparse_categorical_crossentropy',
-                  optimizer=optimizers.Adagrad(lr=0.001, decay=0.0001), 
+    model.compile(loss='categorical_crossentropy',
+                  optimizer=optimizers.Adagrad(), 
                   metrics=['accuracy']) 
     
     
     # TODO 4: Fit the model
-    history = model.fit(X_train, y_train, batch_size=args.batch_size, epochs=args.epochs)
+    history = model.fit(X_train, y_train_categ, batch_size=args.batch_size, epochs=args.epochs)
 
     # TODO 5: Evaluate the model, calculating the metrics.
     # Option 1: Use the model.evaluate() method. For this, the model must be
@@ -137,19 +141,24 @@ def main():
         else:
             sample[1] = 1
     
-    acc = accuracy_score(predictions, y_test_orginal)
+    acc = accuracy_score(predictions, y_test_orginal_categ)
+    
+    print('accuracy: ' + str(acc))
+    predictions = numpy.argmax(predictions, axis=None, out=None)
     # TODO 6: Save the results.
-
+    results = pandas.DataFrame(y_test_orginal, columns=['y_test_orginal'])
+    results.loc[:, 'predicted'] = predictions
+    if args.experiment_name is None or args.experiment_name == "":
+        args.experiment_name = str(args.batch_size) + "-" + str(args.epochs) + "-" + str(args.h_units) + "-" + str(args.reg_l2) + "-" + str(args.dropout)
+    results.to_csv('predictions_{}.csv'.format(args.experiment_name),
+    index=False)
 
     score_file  = open('score_{}.txt'.format(args.experiment_name), 'w')
     score_file.write(str(acc) + '\n')
     score_file.close()
 
-    results = pandas.DataFrame(y_test_orginal, columns=['true_label'])
-    results.loc[:, 'predicted'] = predictions
-    results.to_csv('predictions_{}.csv'.format(args.experiment_name),
-                   index=False)
 
+    
 
 if __name__ == '__main__':
     main()
